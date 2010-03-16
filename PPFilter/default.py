@@ -41,16 +41,21 @@ class DefaultFilter(scanner.ContentFilter):
     def scan_spam(self):
         client = spamc.SpamdClient("/tmp/spamd.sock", self.filepath)
         client.check()
-        print self.parse_spamd_response(client.get_response())
+        if self.parse_spamd_response(client.get_response())['result']:
+            client.close()
+            raise scanner.ContentFilterSpamException(self.parse_spamd_response(client.get_response())['score'])
+                        
         client.close()       
         
     def parse_spamd_response(self, response):
         #m = re.match('SPAMD.* ([0-9]) (.*)', response)
         #sa = m.groups()
-        
-        print response
-        m2 = re.match('Spam: (.*)', response)
-        res = m2.groups()
-        print res
-           
-        return (sa[0], res[0])
+
+        lines = response.split("\r\n")
+        for line in lines:
+            if len(line) != 0:
+                m = re.match('Spam: (.*) ; (.*)', line)
+                if m != None:
+                    print m
+                    sa = {'result': eval(m.group(1)), 'score': m.group(2)}
+                    return sa

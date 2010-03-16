@@ -1,0 +1,30 @@
+Python Policy Filter Daemon
+
+PPFilter is a Filter and will be a policy daemon too (soon) who can process
+and filter spam and virus messages.
+Is designed to be extensible, so you can (probably, will can) write you own
+functions over the main classes.
+
+
+----------------------------------------------------------------
+Add into you master.cf
+
+filterclient    unix    -   -   n   -   10  smtp
+ -o smtp_send_xforward_command=yes
+ -o disable_mime_output_conversion=yes
+ -o smtp_generic_maps=
+
+localhost:10025 inet    n       -       n       -       10      smtpd
+ -o content_filter= 
+ -o receive_override_options=no_unknown_recipient_checks,no_header_body_checks,no_milters
+ -o smtpd_helo_restrictions=
+ -o smtpd_client_restrictions=
+ -o smtpd_sender_restrictions=
+ -o smtpd_recipient_restrictions=permit_mynetworks,reject
+ -o mynetworks=127.0.0.0/8
+ -o smtpd_authorized_xforward_hosts=127.0.0.0/8
+
+-----------------------------------------------------------------
+and into your main.cf:
+
+content_filter = filterclient:127.0.0.1:2525

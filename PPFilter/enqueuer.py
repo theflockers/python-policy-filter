@@ -1,6 +1,6 @@
 import os, tempfile
 
-tempdir = "/tmp/ppf/"
+tempdir = "/tmp/ppf"
 
 class QueueException(Exception):
     pass

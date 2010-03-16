@@ -6,6 +6,9 @@ class ContentFilterException(Exception):
 class ContentFilterVirusException(Exception):
     pass
 
+class ContentFilterSpamException(Exception):
+    pass
+
 class ContentFilter():
 
     filepath = None

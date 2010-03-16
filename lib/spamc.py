@@ -33,10 +33,18 @@ class SpamdClient():
         self.send_data("Content-length: %i" % (int(self.content_len)))
         self.send_data("User: clamav")
         self.send_data("\r\n%s\r\n" % (self.message))
-        self.response = self.sock.recv(1024)
+        
+        data = self.sock.recv(1024)
+        while 1:
+            line = self.sock.recv(1024)
+            if len(line) == 0: break
+            
+            data += line
+        
+        self.response = data.strip()
         
     def get_response(self):
         return self.response
 
     def close(self):
-        self.sock.close()
+        self.sock.close()   

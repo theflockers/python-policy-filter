@@ -8,6 +8,7 @@ import syslog, os, sys, pwd
 address = '127.0.0.1'
 port = 2525
 run_user = 'clamav'
+spam_final = 'tag'
 
 syslog.openlog('ppfilter', syslog.LOG_PID|syslog.LOG_NOWAIT, syslog.LOG_MAIL)
 
@@ -39,6 +40,13 @@ class SMTPD(smtpd.SMTPServer):
 
         except scanner.ContentFilterVirusException, e:
             return        
+  
+        except scanner.ContentFilterSpamException, e:
+            msg = message.Message(filepath)
+            eml = msg.get_message()
+            eml.add_header("X-Spam-Status", "Spam, score: %s" % (e) )
+            msg.write_message()
+            self.send_back(filepath)
                     
     def send_back(self, filepath):
         try:
@@ -66,9 +74,11 @@ if __name__ == "__main__":
         syslog.syslog("starting Python Policy Filter (%s, %s)" % (address, port))
         SMTPD((address, port), None)
         asyncore.loop()
+        
     except NonRootException, e:
         print e
         syslog.closelog()
+        
     except KeyboardInterrupt:
         syslog.syslog("stopping Python Policy Filter (%s, %s)" % (address, port))
         syslog.closelog()
