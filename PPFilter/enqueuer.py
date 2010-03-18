@@ -1,6 +1,5 @@
 import os, tempfile
-
-tempdir = "/tmp/ppf"
+import config
 
 class QueueException(Exception):
     pass
@@ -28,7 +27,7 @@ def enqueue(message):
     data = message['data']
          
     try:
-        qFile = tempfile.NamedTemporaryFile(dir=tempdir, prefix='q', suffix='.tmp', delete=False)
+        qFile = tempfile.NamedTemporaryFile(dir=config.temp_directory, prefix='q', suffix='.tmp', delete=False)
         qFile.write(data)
         qFile.close()
         

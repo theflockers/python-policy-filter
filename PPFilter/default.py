@@ -3,7 +3,7 @@ import socket, string
 import re, os
 import syslog
 import spamc
-
+import config
 #syslog.openlog('ppfilter/cfilter', syslog.LOG_PID, syslog.LOG_MAIL)
 
 class DefaultFilter(scanner.ContentFilter):
@@ -12,10 +12,10 @@ class DefaultFilter(scanner.ContentFilter):
     def scan_virus(self):
         try:
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            if not os.path.exists("/var/run/clamav/clamd.ctl"):
+            if not os.path.exists(config.clamd_socket_path):
                 raise scanner.ContentFilterException('coult not open clamav socket')
                       
-            s.connect("/var/run/clamav/clamd.ctl")
+            s.connect(config.clamd_socket_path)
             s.send("CONTSCAN %s" % ( self.filepath ) )
             data = s.recv(1024)
             s.close()            
@@ -39,7 +39,7 @@ class DefaultFilter(scanner.ContentFilter):
             raise e
 
     def scan_spam(self):
-        client = spamc.SpamdClient("/tmp/spamd.sock", self.filepath)
+        client = spamc.SpamdClient(config.spamd_socket_path, self.filepath)
         client.check()
         if self.parse_spamd_response(client.get_response())['result']:
             client.close()

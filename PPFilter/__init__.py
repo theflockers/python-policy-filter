@@ -1,2 +1,1 @@
-#!/usr/bin/env python
-__all__ = ["enqueuer","scanner","default","dspam","message"]
+__all__ = ["config","enqueuer","scanner","default","dspam","message"]

@@ -5,9 +5,10 @@ class SpamdClientException(Exception):
 
 class SpamdClient():
 
-    def __init__(self, sockpath, filepath):
+    def __init__(self, sockpath, user, filepath):
         self.sockpath = sockpath
         self.filepath = filepath
+        self.user     = user
         
         self.prepare()
         self.connect()
@@ -31,7 +32,7 @@ class SpamdClient():
     def check(self): 
         self.send_data("CHECK SPAMC/1.4")
         self.send_data("Content-length: %i" % (int(self.content_len)))
-        self.send_data("User: clamav")
+        self.send_data("User: %" % (self.user))
         self.send_data("\r\n%s\r\n" % (self.message))
         
         data = self.sock.recv(1024)
@@ -47,4 +48,4 @@ class SpamdClient():
         return self.response
 
     def close(self):
-        self.sock.close()   
+        self.sock.close()

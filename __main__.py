@@ -5,11 +5,6 @@ import smtplib, tempfile
 from PPFilter import *
 import syslog, os, sys, pwd
 
-address = '127.0.0.1'
-port = 2525
-run_user = 'clamav'
-spam_final = 'tag'
-
 syslog.openlog('ppfilter', syslog.LOG_PID|syslog.LOG_NOWAIT, syslog.LOG_MAIL)
 
 class NonRootException(Exception):
@@ -42,15 +37,18 @@ class SMTPD(smtpd.SMTPServer):
             return        
   
         except scanner.ContentFilterSpamException, e:
-            msg = message.Message(filepath)
-            eml = msg.get_message()
-            eml.add_header("X-Spam-Status", "Spam, score: %s" % (e) )
-            msg.write_message()
-            self.send_back(filepath)
+            if spam_final_action == "tag":
+                msg = message.Message(filepath)
+                eml = msg.get_message()
+                eml.add_header("X-Spam-Status", "Spam, score: %s" % (e) )
+                msg.write_message()
+                self.send_back(filepath)
+            elif spam_final_action == "discard":
+                pass
                     
     def send_back(self, filepath):
         try:
-            client = smtplib.SMTP('127.0.0.1', 10025)
+            client = smtplib.SMTP(config.reinject_address, config.reinject_port)
             #client.set_debuglevel(True)
             client.sendmail(self.message['mailfrom'], self.message['rcpts'], open(filepath).read()) 
             os.unlink(filepath)
@@ -63,16 +61,16 @@ def run_as_user(user):
     if os.getuid() != 0:
         raise NonRootException('this program must to be started as root')
 
-    user_info = pwd.getpwnam(run_user)
+    user_info = pwd.getpwnam(config.run_user)
     uid = user_info[2]
     os.setuid(uid)
 
 if __name__ == "__main__":
 
     try:
-        run_as_user(run_user)
-        syslog.syslog("starting Python Policy Filter (%s, %s)" % (address, port))
-        SMTPD((address, port), None)
+        run_as_user(config.run_user)
+        syslog.syslog("starting Python Policy Filter (%s, %s)" % (config.listen_address, config.listen_port))
+        SMTPD((config.listen_address, int(config.listen_port)), None)
         asyncore.loop()
         
     except NonRootException, e:
