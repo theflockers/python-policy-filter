@@ -1,76 +1,64 @@
-import threading
 import socket
-import time
+import SocketServer
+import threading
+import sys
 
-max_threads = 10
+class SMTPRequestHandler(SocketServer.BaseRequestHandler):
 
-class Server:
-    
-    server = None
+    read_data = False
 
-    def __init__(self, host, port, listen_sockets, unix_socket=False):
-    
-        self.host           = host
-        self.port           = port
-        self.listen_sockets = listen_sockets
-        self.unix_socket    = unix_socket 
+    def handle(self):
         
-    def create_socket(self):
-        try:
-            if not self.unix_socket:
-                self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.server.bind((self.host, self.port))
-                self.server.listen(self.listen_sockets)
-                
-                print 'bunda'
-                return self.server
-                
-        except Exception, e:
-            print e            
-        
-class ThreadHandler(threading.Thread):
-    
-    rcpts = []
-    
-    def __init__(self):
-        super(ThreadHandler, self).__init__()
-        
-    def run(self, s, data):
-        
-        self.data = data
+        # run forever
+        while True:
+            if not self.read_data: 
+                if self.request:
+                    self.data = self.request.recv(1024)
+                try:
+                    self.parse_commands()
+                except AttributeError:
+                    self.request.send("500 Unknown command\r\n")
 
-        if self.data.find("HELO") == 0:
-            command = self.data.split(' ')
-            self.helo = command[1]
-            s.send("220 theflockers.localdomain\r\n")
-            
-        elif self.data.find("MAIL") == 0:
-            command = self.data.split(':')
-            self.mail_from = command[1]
-            s.send("250 Ok\r\n")            
-                
-        elif self.data.find("RCPT") == 0:
-            command = self.data.split(':')
-            self.rcpts.append(command[1])
-            s.send("250 Ok\r\n")
-            
-        elif self.data.find("QUIT") == 0:
-            return 
-                   
-        else:
-            s.send("501 Unknown\r\n")
-            
-def main():
-    
-    server = Server("localhost", 2525, 100)
-    s = server.create_socket()
-    conn, addr = s.accept()
+    def parse_commands(self):
 
-    conn.send("220 theflockers.localdomain ESMTP\r\n")
-    while True:
-        data = conn.recv(1024)
-        t = ThreadHandler()
-        t.run(conn, data)
-            
-if __name__ == "__main__":
-    main()
+        cmd = []
+        cmd = self.data.split(' ')
+        if len(cmd) < 2:
+            cmd[0] = self.data.strip()
+
+        print len(cmd)
+        method = "self.smtp_"+ cmd[0].upper().strip() + '()'
+        print method
+        eval(method)
+    
+    def smtp_MAIL(self):
+        self.request.send("220 Ok\r\n")
+
+    def smtp_HELO(self):
+        self.request.send("220 Ok\r\n")
+
+    def smtp_QUIT(self):
+        self.request.send("220 Bye\r\n")
+        self.request.close()
+
+    def smtp_DOT(self):
+        self.request.send("250 Ok\r\n")
+
+    def smtp_DATA(self):
+        self.request.send("354 Start mail input; end with '.'\r\n")
+        self.read_data = True
+        self.data = self.request.recv(1024)
+        self.read_data = False
+        print self.data
+        
+
+class SMTPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    pass
+
+HOST, PORT = 'localhost', 2525
+
+server = SMTPServer( (HOST, PORT), SMTPRequestHandler)
+ip, port = server.server_address
+
+server_thread = threading.Thread(target=server.serve_forever)
+server_thread.start()
