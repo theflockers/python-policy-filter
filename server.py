@@ -1,45 +1,76 @@
-import SocketServer, re, sys, threading
+import threading
+import socket
+import time
 
-class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
+max_threads = 10
 
-    def handle(self):
+class Server:
     
-        self.data = self.request.recv(1024)
-        self.rcpts = []
+    server = None
 
-        m = re.match('(\w+).?(\w+).?(.+)?', self.data)
+    def __init__(self, host, port, listen_sockets, unix_socket=False):
+    
+        self.host           = host
+        self.port           = port
+        self.listen_sockets = listen_sockets
+        self.unix_socket    = unix_socket 
         
-        print m.groups()
-        if m:
-            if m.group(1) == "HELO":
-                self.helo_host = m.group(2)
-                self.request.send("220 localhost\r\n")
-             
-            if m.group(1) == "MAIL":
-                self.mail_from = m.group(2)
-                self.request.send("250 Ok\r\n")            
+    def create_socket(self):
+        try:
+            if not self.unix_socket:
+                self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.server.bind((self.host, self.port))
+                self.server.listen(self.listen_sockets)
                 
-            if m.group(1) == "RCPT":
-                self.rcpts.append(m.group(2))
-                self.request.send("250 Ok\r\n")
+                print 'bunda'
+                return self.server
                 
-            if m.group(1) == "DATA": 
-                self.request.send("354 Enter mail, end with \".\" on a line by itself\r\n")
+        except Exception, e:
+            print e            
+        
+class ThreadHandler(threading.Thread):
+    
+    rcpts = []
+    
+    def __init__(self):
+        super(ThreadHandler, self).__init__()
+        
+    def run(self, s, data):
+        
+        self.data = data
 
-class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
-    pass
+        if self.data.find("HELO") == 0:
+            command = self.data.split(' ')
+            self.helo = command[1]
+            s.send("220 theflockers.localdomain\r\n")
+            
+        elif self.data.find("MAIL") == 0:
+            command = self.data.split(':')
+            self.mail_from = command[1]
+            s.send("250 Ok\r\n")            
+                
+        elif self.data.find("RCPT") == 0:
+            command = self.data.split(':')
+            self.rcpts.append(command[1])
+            s.send("250 Ok\r\n")
+            
+        elif self.data.find("QUIT") == 0:
+            return 
+                   
+        else:
+            s.send("501 Unknown\r\n")
+            
+def main():
+    
+    server = Server("localhost", 2525, 100)
+    s = server.create_socket()
+    conn, addr = s.accept()
 
-
+    conn.send("220 theflockers.localdomain ESMTP\r\n")
+    while True:
+        data = conn.recv(1024)
+        t = ThreadHandler()
+        t.run(conn, data)
+            
 if __name__ == "__main__":
-    # Port 0 means to select an arbitrary unused port
-    HOST, PORT = "localhost", 2525
-
-    server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
-    ip, port = server.server_address
-
-    # Start a thread with the server -- that thread will then start one
-    # more thread for each request
-    server_thread = threading.Thread(target=server.serve_forever)
-    # Exit the server thread when the main thread terminates
-    #server_thread.setDaemon(True)
-    server_thread.start()
+    main()
