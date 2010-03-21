@@ -1,26 +1,27 @@
 #!/usr/bin/env python
 
-import smtpd, asyncore, asynchat
 import smtplib, tempfile
 from PPFilter import *
 import syslog, os, sys, pwd
+import ppsmtpd, socket
+import threading
 
 syslog.openlog('ppfilter', syslog.LOG_PID|syslog.LOG_NOWAIT, syslog.LOG_MAIL)
 
 class NonRootException(Exception):
     pass
 
-class SMTPD(smtpd.SMTPServer):
+class SMTPD(ppsmtpd.SMTPServer):
 
     message  = None
 
-    def process_message(self, peer, mailfrom, rcpttos, data):
-    
+    def process_message(self, mail_from, rcpts_to, message):
+   
+        self.message = message 
         filepath = None
 
         try:
-            syslog.syslog("connect from peer: %s" % (peer[0]) )
-            self.message = {'peer': peer, 'mailfrom': mailfrom, 'rcpts': rcpttos, 'data': data}
+            self.message = {'mailfrom': mail_from, 'rcpts': rcpts_to, 'data': message}
             filepath = enqueuer.enqueue(self.message)
             if filepath != None:
                 sc = default.DefaultFilter(filepath)
@@ -68,10 +69,21 @@ def run_as_user(user):
 if __name__ == "__main__":
 
     try:
+
         run_as_user(config.run_user)
-        syslog.syslog("starting Python Policy Filter (%s, %s)" % (config.listen_address, config.listen_port))
-        SMTPD((config.listen_address, int(config.listen_port)), None)
-        asyncore.loop()
+        HOST, PORT = config.listen_address, config.listen_port
+
+        syslog.syslog("starting Python Policy Filter (%s, %s)" % (HOST, PORT))
+        server = SMTPD( (HOST, int(PORT)), ppsmtpd.SMTPRequestHandler)
+        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+        ip, port = server.server_address
+
+        server_thread = threading.Thread(target=server.serve_forever)
+        server_thread.start()
+       
+
+        #SMTPD((config.listen_address, int(config.listen_port)), None)
+        #asyncore.loop()
         
     except NonRootException, e:
         print e

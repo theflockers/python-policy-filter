@@ -3,4 +3,4 @@
 PWD=$(pwd)
 export PYTHONPATH=".:${PWD}/lib"
 
-python $PWD
+python teste.py
