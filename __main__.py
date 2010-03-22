@@ -4,9 +4,12 @@ import smtplib, tempfile
 from PPFilter import *
 import syslog, os, sys, pwd
 import ppsmtpd, socket
-import threading
+import threading, signal
 
 syslog.openlog('ppfilter', syslog.LOG_PID|syslog.LOG_NOWAIT, syslog.LOG_MAIL)
+
+def handler(signum, frame):
+    print 'recebido'
 
 class NonRootException(Exception):
     pass
@@ -15,13 +18,13 @@ class SMTPD(ppsmtpd.SMTPServer):
 
     message  = None
 
-    def process_message(self, mail_from, rcpts_to, message):
+    def process_message(self, mail_from, rcpts_to, message_data):
    
-        self.message = message 
+        self.message_data = message_data
         filepath = None
 
         try:
-            self.message = {'mailfrom': mail_from, 'rcpts': rcpts_to, 'data': message}
+            self.message = {'mailfrom': mail_from, 'rcpts': rcpts_to, 'data': message_data}
             filepath = enqueuer.enqueue(self.message)
             if filepath != None:
                 sc = default.DefaultFilter(filepath)
@@ -38,13 +41,13 @@ class SMTPD(ppsmtpd.SMTPServer):
             return        
   
         except scanner.ContentFilterSpamException, e:
-            if spam_final_action == "tag":
+            if config.spam_final_action == "tag":
                 msg = message.Message(filepath)
                 eml = msg.get_message()
                 eml.add_header("X-Spam-Status", "Spam, score: %s" % (e) )
                 msg.write_message()
                 self.send_back(filepath)
-            elif spam_final_action == "discard":
+            elif config.spam_final_action == "discard":
                 pass
                     
     def send_back(self, filepath):
