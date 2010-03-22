@@ -31,12 +31,9 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
                     for text in self.data.split('\r\n'):
                         if text and text[0] == '.':
                             self.data = 'DOT'
+                            self.parse_commands()
                         else:
                             self.message += text + "\r\n"
-                        
-                   # if re.match('^\.$', self.data.strip()):
-                   #     self.data = 'DOT'
-                    self.parse_commands()
 
                 else:
                     self.data = self.request.recv(1024)

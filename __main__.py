@@ -8,11 +8,9 @@ import threading, signal
 
 syslog.openlog('ppfilter', syslog.LOG_PID|syslog.LOG_NOWAIT, syslog.LOG_MAIL)
 
-def handler(signum, frame):
-    print 'recebido'
+class NonRootException(Exception): pass
 
-class NonRootException(Exception):
-    pass
+class SendingBackException(Exception): pass
 
 class SMTPD(ppsmtpd.SMTPServer):
 
@@ -39,6 +37,9 @@ class SMTPD(ppsmtpd.SMTPServer):
 
         except scanner.ContentFilterVirusException, e:
             return        
+        
+        except SendingBackException, e:
+            return e.message
   
         except scanner.ContentFilterSpamException, e:
             if config.spam_final_action == "tag":
@@ -59,7 +60,7 @@ class SMTPD(ppsmtpd.SMTPServer):
             return 
             
         except Exception, e:
-            self.push('451 '+ e.message + "\n")
+            raise SendingBackException('451 '+ e.message)
 
 def run_as_user(user):
     if os.getuid() != 0:
@@ -69,11 +70,18 @@ def run_as_user(user):
     uid = user_info[2]
     os.setuid(uid)
 
+def do_sanity_check():
+    if not os.path.exists(config.temp_directory):
+        os.mkdir(config.temp_directory)
+
 if __name__ == "__main__":
 
     try:
 
         run_as_user(config.run_user)
+
+        do_sanity_check()
+
         HOST, PORT = config.listen_address, config.listen_port
 
         syslog.syslog("starting Python Policy Filter (%s, %s)" % (HOST, PORT))
