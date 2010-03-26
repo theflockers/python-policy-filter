@@ -86,15 +86,12 @@ if __name__ == "__main__":
 
         syslog.syslog("starting Python Policy Filter (%s, %s)" % (HOST, PORT))
         server = SMTPD( (HOST, int(PORT)), ppsmtpd.SMTPRequestHandler)
-        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+        server.daemon_threads = True
+        server.allow_reuse_address = True
         ip, port = server.server_address
 
         server_thread = threading.Thread(target=server.serve_forever)
         server_thread.start()
-       
-
-        #SMTPD((config.listen_address, int(config.listen_port)), None)
-        #asyncore.loop()
         
     except NonRootException, e:
         print e

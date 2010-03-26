@@ -1,7 +1,7 @@
 import socket
 import SocketServer
 import threading
-import sys
+import sys, time
 import re
 import signal
 
@@ -27,25 +27,32 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
             while True:
                 if self.read_data:
                     self.data = self.request.recv(4096)
-                    print self.data + '*'
+                    if len(self.data) == 0:
+                        self.request.close()
+
                     for text in self.data.split('\r\n'):
-                        if text and text[0] == '.':
+                        if text and text[0].strip() == '.':
                             self.data = 'DOT'
                             self.parse_commands()
+                            return
                         else:
                             self.message += text + "\r\n"
 
                 else:
                     self.data = self.request.recv(1024)
-                    print self.data + '*'
-                    self.parse_commands()
-                
-        finally:
+                    print threading.currentThread()
+                    if len(self.data) != 0:
+                         print self.data
+                         self.parse_commands()
+
+        except AttributeError:
+            self.request.send('500 Unknown command\r\n')
             self.request.close()
-#        except AttributeError:
-#            self.request.send('500 Unknown command\r\n')
-#        except Exception:
-#            pass
+
+        finally:
+            print "Finish"
+            self.request.close()
+            self.f_socket.close()
 
     def send_data(self, data):
         print data
@@ -76,6 +83,12 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
     def smtp_QUIT(self):
         self.send_data('221 Bye')
         self.request.close()
+
+    def smtp_RSET(self):
+        self.mail_from = None
+        self.rcpts_to = []
+        self.message = ''
+        self.send_data('250 Ok')
 
     def smtp_DOT(self):
         response = self.server.process_message(self.mail_from, self.rcpts_to, self.message)
