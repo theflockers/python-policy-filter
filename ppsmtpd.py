@@ -24,6 +24,7 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
         try:
             self.f_socket = self.request.makefile()
             self.send_data("220 %s PPFilter ESMTP" % (self.hostname) )
+            self.rcpts_to = []
             while True:
                 if self.read_data:
                     self.data = self.request.recv(4096)
@@ -31,7 +32,8 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
                         self.request.close()
 
                     for text in self.data.split('\r\n'):
-                        if text and text[0].strip() == '.':
+                        print ">", text, "<"
+                        if text and text.strip() == '.':
                             self.data = 'DOT'
                             self.parse_commands()
                             return

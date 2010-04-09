@@ -47,14 +47,18 @@ class SMTPD(ppsmtpd.SMTPServer):
                 eml = msg.get_message()
                 eml.add_header("X-Spam-Status", "Spam, score: %s" % (e) )
                 msg.write_message()
-                self.send_back(filepath)
+                try:
+                    self.send_back(filepath)
+                except SendingBackException, e:
+                    return e.message
+
             elif config.spam_final_action == "discard":
                 pass
                     
     def send_back(self, filepath):
         try:
             client = smtplib.SMTP(config.reinject_address, config.reinject_port)
-            #client.set_debuglevel(True)
+            client.set_debuglevel(True)
             client.sendmail(self.message['mailfrom'], self.message['rcpts'], open(filepath).read()) 
             os.unlink(filepath)
             return 
