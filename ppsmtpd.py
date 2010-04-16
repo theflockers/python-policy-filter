@@ -1,3 +1,8 @@
+"""
+ PPFilter simple smtpd server handler
+ @author Leandro Mendes
+ @copyright Leandro Mendes <theflockers@gmail.com> 
+"""
 import socket
 import SocketServer
 import threading
