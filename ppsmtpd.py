@@ -6,7 +6,7 @@
 import socket
 import SocketServer
 import threading
-import sys, time
+import sys, time, errno
 import re
 import signal
 
@@ -51,6 +51,10 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
                     if len(self.data) != 0:
                          print self.data
                          self.parse_commands()
+
+        except IOError, e:
+            if e.errno == errno.EPIPE
+            return
 
         except AttributeError:
             self.request.send('500 Unknown command\r\n')
