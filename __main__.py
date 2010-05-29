@@ -5,8 +5,13 @@ from PPFilter import *
 import syslog, os, sys, pwd
 import ppsmtpd, socket
 import threading, signal
+import setproctitle as spc
+
+title = 'PPFilter (idle)'
 
 syslog.openlog('ppfilter', syslog.LOG_PID|syslog.LOG_NOWAIT, syslog.LOG_MAIL)
+
+spc.setproctitle(title)
 
 class NonRootException(Exception): pass
 
@@ -17,7 +22,8 @@ class SMTPD(ppsmtpd.SMTPServer):
     message  = None
 
     def process_message(self, mail_from, rcpts_to, message_data):
-   
+
+        spc.setproctitle('PPFilter (processing)')
         self.message_data = message_data
         filepath = None
 
@@ -26,21 +32,22 @@ class SMTPD(ppsmtpd.SMTPServer):
             filepath = enqueuer.enqueue(self.message)
             if filepath != None:
                 sc = default.DefaultFilter(filepath)
+                spc.setproctitle('PPFilter (scanning)')
                 sc.scan()
                 self.send_back(filepath)
-                
+
         except enqueuer.QueueException, e:
             return "451 Requested action aborted: %s" % (e.message)
-                       
+
         except scanner.ContentFilterException, e:
             return "451 Requested action aborted: %s" % (e.message)
 
         except scanner.ContentFilterVirusException, e:
-            return        
-        
+            return
+
         except SendingBackException, e:
             return e.message
-  
+
         except scanner.ContentFilterSpamException, e:
             if config.spam_final_action == "tag":
                 msg = message.Message(filepath)
@@ -49,20 +56,28 @@ class SMTPD(ppsmtpd.SMTPServer):
                 msg.write_message()
                 try:
                     self.send_back(filepath)
+                    spc.setproctitle('PPFilter (idle)')
                 except SendingBackException, e:
                     return e.message
 
             elif config.spam_final_action == "discard":
                 pass
-                    
+
+        finally:
+            spc.setproctitle('PPFilter (idle)')
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
     def send_back(self, filepath):
         try:
             client = smtplib.SMTP(config.reinject_address, config.reinject_port)
-            client.set_debuglevel(True)
-            client.sendmail(self.message['mailfrom'], self.message['rcpts'], open(filepath).read()) 
+            response = client.sendmail(self.message['mailfrom'], self.message['rcpts'], open(filepath).read())
             os.unlink(filepath)
-            return 
-            
+            for rcpt in self.message['rcpts']:
+                syslog.syslog('from=%s, to=%s, relay=%s:%s, status=sent (%s)' % (self.message['mailfrom'], rcpt, config.reinject_address, str(config.reinject_port), response[1]) )
+
+            return
+
         except Exception, e:
             raise SendingBackException('451 '+ e.message)
 
@@ -96,11 +111,11 @@ if __name__ == "__main__":
 
         server_thread = threading.Thread(target=server.serve_forever)
         server_thread.start()
-        
+
     except NonRootException, e:
         print e
         syslog.closelog()
-        
+
     except KeyboardInterrupt:
         syslog.syslog("stopping Python Policy Filter (%s, %s)" % (address, port))
         syslog.closelog()

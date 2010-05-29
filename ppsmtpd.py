@@ -37,7 +37,7 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
                         self.request.close()
 
                     for text in self.data.split('\r\n'):
-                        print ">", text, "<"
+                        # print ">", text, "<"
                         if text and text.strip() == '.':
                             self.data = 'DOT'
                             self.parse_commands()
@@ -47,26 +47,27 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
 
                 else:
                     self.data = self.request.recv(1024)
-                    print threading.currentThread()
+                    # print threading.currentThread()
                     if len(self.data) != 0:
-                         print self.data
+                         # print self.data
                          self.parse_commands()
 
         except IOError, e:
-            if e.errno == errno.EPIPE
-            return
+            if e.errno == errno.EPIPE:
+                self.f_socket.close()
+                return
 
         except AttributeError:
             self.request.send('500 Unknown command\r\n')
-            self.request.close()
+            #self.request.close()
 
         finally:
-            print "Finish"
+            #print "Finish"
             self.request.close()
-            self.f_socket.close()
+            return
 
     def send_data(self, data):
-        print data
+        # print data
         self.request.send(data + "\r\n")
         self.f_socket.flush()
 
@@ -77,7 +78,7 @@ class SMTPRequestHandler(SocketServer.BaseRequestHandler):
             cmd[0] = self.data.strip()
 
         method = (('self.smtp_' + cmd[0].upper().strip()) + '()')
-        print method
+        # print method
         eval(method)
 
     def smtp_MAIL(self):
